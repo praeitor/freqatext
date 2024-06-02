@@ -4,6 +4,12 @@ import os
 from transformers import MarianMTModel, MarianTokenizer
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import nltk
+from nltk.corpus import stopwords
+
+# Загрузим список стоп-слов
+nltk.download('stopwords')
+stop_words = set(stopwords.words('english'))
 
 def text_to_columns(text):
     # Приводим текст к нижнему регистру для учета регистра
@@ -11,6 +17,9 @@ def text_to_columns(text):
     
     # Разделяем текст на слова, удаляя знаки препинания
     words = re.findall(r'\b\w+\b', text)
+    
+    # Исключаем стоп-слова
+    words = [word for word in words if word not in stop_words]
     
     # Подсчитываем количество вхождений каждого слова
     word_count = {}
@@ -33,9 +42,9 @@ def translate_word(word, model, tokenizer):
     translated_text = tokenizer.decode(translated[0], skip_special_tokens=True)
     return word, translated_text
 
-def translate_words(words, model, tokenizer):
+def translate_words(words, model, tokenizer, max_workers=4):
     translations = {}
-    with ThreadPoolExecutor() as executor:
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_word = {executor.submit(translate_word, word, model, tokenizer): word for word in words}
         for future in tqdm(as_completed(future_to_word), total=len(words), desc="Translating words"):
             word, translated_text = future.result()
@@ -46,6 +55,7 @@ def main():
     # Парсим аргументы командной строки
     parser = argparse.ArgumentParser(description='Process a text file and count word occurrences.')
     parser.add_argument('filename', type=str, help='The path to the text file to process')
+    parser.add_argument('--threads', type=int, default=4, help='The number of threads to use for translation')
     
     args = parser.parse_args()
     
@@ -65,7 +75,7 @@ def main():
     unique_words = [word for word, count in result]
     
     # Переводим слова
-    translations = translate_words(unique_words, model, tokenizer)
+    translations = translate_words(unique_words, model, tokenizer, max_workers=args.threads)
     
     # Формируем имя выходного файла
     base_filename = os.path.splitext(args.filename)[0]
