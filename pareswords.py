@@ -3,6 +3,7 @@ import argparse
 import os
 from transformers import MarianMTModel, MarianTokenizer
 from tqdm import tqdm
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def text_to_columns(text):
     # Приводим текст к нижнему регистру для учета регистра
@@ -26,13 +27,19 @@ def text_to_columns(text):
     # Возвращаем результат и количество уникальных слов
     return word_count_list, len(word_count)
 
+def translate_word(word, model, tokenizer):
+    inputs = tokenizer(word, return_tensors="pt", padding=True)
+    translated = model.generate(**inputs)
+    translated_text = tokenizer.decode(translated[0], skip_special_tokens=True)
+    return word, translated_text
+
 def translate_words(words, model, tokenizer):
     translations = {}
-    for word in tqdm(words, desc="Translating words"):
-        inputs = tokenizer(word, return_tensors="pt", padding=True)
-        translated = model.generate(**inputs)
-        translated_text = tokenizer.decode(translated[0], skip_special_tokens=True)
-        translations[word] = translated_text
+    with ThreadPoolExecutor() as executor:
+        future_to_word = {executor.submit(translate_word, word, model, tokenizer): word for word in words}
+        for future in tqdm(as_completed(future_to_word), total=len(words), desc="Translating words"):
+            word, translated_text = future.result()
+            translations[word] = translated_text
     return translations
 
 def main():
