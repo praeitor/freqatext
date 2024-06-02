@@ -42,7 +42,7 @@ def translate_word(word, model, tokenizer):
     translated_text = tokenizer.decode(translated[0], skip_special_tokens=True)
     return word, translated_text
 
-def translate_words(words, model, tokenizer, max_workers=4):
+def translate_words(words, model, tokenizer, max_workers=10):
     translations = {}
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_word = {executor.submit(translate_word, word, model, tokenizer): word for word in words}
