@@ -1,6 +1,7 @@
 import re
 import argparse
 import os
+import time
 from transformers import MarianMTModel, MarianTokenizer
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -41,7 +42,7 @@ def translate_word(word, model, tokenizer):
     translated_text = tokenizer.decode(translated[0], skip_special_tokens=True)
     return word, translated_text
 
-def translate_words(words, model, tokenizer, max_workers=4):
+def translate_words(words, model, tokenizer, max_workers=8):
     translations = {}
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_word = {executor.submit(translate_word, word, model, tokenizer): word for word in words}
@@ -56,7 +57,9 @@ def main():
     parser.add_argument('--threads', type=int, default=os.cpu_count(), help='The number of threads to use for translation')
     
     args = parser.parse_args()
-    
+
+    start_time = time.time()  # Начало измерения времени
+
     with open(args.filename, 'r', encoding='utf-8') as file:
         text = file.read()
     
@@ -79,7 +82,10 @@ def main():
         for word, count in tqdm(result, desc="Writing to file"):
             output_file.write(f"{word:20} {count:20} {translations[word]}\n")
     
+    end_time = time.time()  # Конец измерения времени
+
     print(f"Результат сохранен в файл: {output_filename}")
+    print(f"Время выполнения: {end_time - start_time:.2f} секунд")
 
 if __name__ == "__main__":
     main()
